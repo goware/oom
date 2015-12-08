@@ -1,6 +1,6 @@
 oom
 ============
-[![GoDoc](https://godoc.org/github.com/goware/oom?status.svg)](https://godoc.org/github.com/goware/oom) [![Go Report Card](http://goreportcard.com/badge/goware/oom)](http://goreportcard.com/report/goware/oom)
+[![GoDoc](https://godoc.org/github.com/goware/oom?status.svg)](https://godoc.org/github.com/goware/oom) [![Go Report Card](https://goreportcard.com/badge/goware/oom)](http://goreportcard.com/report/goware/oom) [![License:MIT](https://img.shields.io/badge/license-MIT-brightgreen.svg)](https://github.com/goware/oom/blob/master/LICENSE.md)
 
 `oom` is a small collection of middlewares for [chi](https://github.com/pressly/chi) that help you handle your system running out of memory
 
