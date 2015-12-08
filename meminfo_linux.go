@@ -14,6 +14,7 @@ import (
 
 var meminfo = &MemInfo{}
 
+// MemoryUsage usage returns used to total memory ratio
 func MemoryUsage() float64 {
 	meminfo.Update()
 
@@ -24,6 +25,8 @@ func MemoryUsage() float64 {
 	return float64(meminfo.Used()) / float64(total)
 }
 
+// SetUpdateInteval updates the interval between MemInfo updates. By default
+// Updates happen on every request
 func SetUpdateInteval(i time.Duration) {
 	if i.Nanoseconds() == 0 {
 		return
@@ -35,6 +38,8 @@ func SetUpdateInteval(i time.Duration) {
 
 // Following is copied/adapted github.com/guillermo/go.procmeminfo
 
+// MemInfo contains data feched from /proc/meminfo, mutex preventing races and
+// update frequency related fields
 type MemInfo struct {
 	mutex          sync.RWMutex
 	lastUpdate     time.Time // in milliseconds
@@ -43,6 +48,7 @@ type MemInfo struct {
 	Values map[string]uint64
 }
 
+// Update get fresh data from /proc/meminfo
 func (m *MemInfo) Update() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -99,7 +105,7 @@ func (m *MemInfo) Update() error {
 	return nil
 }
 
-// Total() returns total RAM of system
+// Total returns total RAM of system
 func (m *MemInfo) Total() uint64 {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -108,7 +114,7 @@ func (m *MemInfo) Total() uint64 {
 	return total
 }
 
-// Available() returns the amount of still RAM available
+// Available returns the amount of still RAM available
 // It uses new process mem available estimation - factors in reclaiming file
 // buffers and cache.
 // On Linux kernels 3.14+ it tens to err on the side of caution
@@ -127,7 +133,7 @@ func (m *MemInfo) Available() uint64 {
 	return fr + buf + ca
 }
 
-// Used() returns the amount of non-reclaimable memory used
+// Used returns the amount of non-reclaimable memory used
 func (m *MemInfo) Used() uint64 {
 	return m.Total() - m.Available()
 }

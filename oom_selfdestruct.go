@@ -12,7 +12,7 @@ import (
 
 var terminating int32
 
-// OOMSefldestruct is a middleware that terminates current process if system
+// OOMSelfdestruct is a middleware that terminates current process if system
 // memory use exceeds the threshold set.
 //
 // Most common use case is automatic restart of leaky *cough*GCO*cough service
@@ -26,14 +26,13 @@ var terminating int32
 // returining bool - false indicates failure
 // If shutdown function is not provided it uses system signals to initialize
 // selfdestruct, so any graceful shutdown you have in place should just work
-
+//
 // Right now it relies on memory usage data provided by /proc/meminfo so it is
 // Linux specific. For convenience (dev envs) it will do nothing on other archs
-
 func OOMSelfdestruct(limit float64, fn ...func(ctx context.Context) bool) func(chi.Handler) chi.Handler {
 	return func(next chi.Handler) chi.Handler {
 		fn := func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-			if limit < MemoryUsage() {
+			if MemoryUsage() > limit {
 				go selfdestruct(ctx, fn...)
 			}
 
