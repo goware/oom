@@ -19,21 +19,18 @@ var terminating int32
 // all you need is this middleware and something that will start the process
 // again after it's been terminated (docker --restart=always for example )
 //
-// OOMSelfdestruct accepts two parameters, second one is optional:
-// - a float64 defining a fraction of the system memory that can be used before
-// process self-terminates
-// - optional shutdown function taking context.Context as parameter and
-// returining bool - false indicates failure
-// If shutdown function is not provided it uses system signals to initialize
-// selfdestruct, so any graceful shutdown you have in place should just work
+// OOMSelfdestruct accepts one parameter - a float64 defining a fraction of the
+// system memory that can be used before process self-terminates using system
+// signal (SIG_TERM).
+// As long as the app handles shutdown gracefully on SIG_TERM it should just work
 //
 // Right now it relies on memory usage data provided by /proc/meminfo so it is
 // Linux specific. For convenience (dev envs) it will do nothing on other archs
-func OOMSelfdestruct(limit float64, fn ...func(ctx context.Context) bool) func(chi.Handler) chi.Handler {
+func OOMSelfdestruct(limit float64) func(chi.Handler) chi.Handler {
 	return func(next chi.Handler) chi.Handler {
 		fn := func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 			if MemoryUsage() > limit {
-				go selfdestruct(ctx, fn...)
+				go selfdestruct(ctx, signalSelfdestruct)
 			}
 
 			next.ServeHTTPC(ctx, w, r)
@@ -42,25 +39,40 @@ func OOMSelfdestruct(limit float64, fn ...func(ctx context.Context) bool) func(c
 	}
 }
 
-func selfdestruct(ctx context.Context, fn ...func(ctx context.Context) bool) {
+// OOMSelfdestructFn is a version of OOMSelfdestruct that accepts a custom
+// termination function ( func(context.Context) bool ) that handles the process
+// shutdown.
+// Use it if your app requires extra steps to gracefully shut down.
+func OOMSelfdestructFn(limit float64, fn func(ctx context.Context) bool) func(chi.Handler) chi.Handler {
+	return func(next chi.Handler) chi.Handler {
+		fn := func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+			if MemoryUsage() > limit {
+				go selfdestruct(ctx, fn)
+			}
+
+			next.ServeHTTPC(ctx, w, r)
+		}
+		return chi.HandlerFunc(fn)
+	}
+}
+
+func selfdestruct(ctx context.Context, fn func(ctx context.Context) bool) {
 	// if it's already terminating do nothing
 	if !atomic.CompareAndSwapInt32(&terminating, 0, 1) {
 		return
 	}
-	if len(fn) > 0 {
-		if !fn[0](ctx) {
-			// selfdestruct failed, give future requests a chance to try again
-			atomic.CompareAndSwapInt32(&terminating, 1, 0)
-		}
-		return
+	if !fn(ctx) {
+		// selfdestruct failed, give future requests a chance to try again
+		atomic.CompareAndSwapInt32(&terminating, 1, 0)
 	}
+}
 
+func signalSelfdestruct(ctx context.Context) bool {
 	proc, err := os.FindProcess(os.Getpid())
 	if err == nil {
 		if err = proc.Signal(syscall.SIGTERM); err == nil {
-			return
+			return true
 		}
 	}
-	// selfdestruct failed, give future requests a chance to try again
-	atomic.CompareAndSwapInt32(&terminating, 1, 0)
+	return false
 }
