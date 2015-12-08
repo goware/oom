@@ -1,6 +1,6 @@
 // +build linux
 
-package selfdestruct
+package oom
 
 import (
 	"bufio"

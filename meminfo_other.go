@@ -1,6 +1,6 @@
 // +build !linux
 
-package selfdestruct
+package oom
 
 // MemoryUsage does nothing if you're not on Linux
 // Implementations for other OSes/archs are always welcome
