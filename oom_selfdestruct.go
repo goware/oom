@@ -30,7 +30,7 @@ func Selfdestruct(limit float64) func(chi.Handler) chi.Handler {
 	return func(next chi.Handler) chi.Handler {
 		fn := func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 			if MemoryUsage() > limit {
-				go selfdestruct(ctx, signalSelfdestruct)
+				go selfdestruct(ctx, SignalSelfdestructGroup)
 			}
 
 			next.ServeHTTPC(ctx, w, r)
@@ -63,11 +63,23 @@ func selfdestruct(ctx context.Context, fn func(ctx context.Context) bool) {
 	}
 	if !fn(ctx) {
 		// selfdestruct failed, give future requests a chance to try again
-		atomic.CompareAndSwapInt32(&terminating, 1, 0)
+		atomic.SwapInt32(&terminating, 0)
 	}
 }
 
-func signalSelfdestruct(ctx context.Context) bool {
+// SignalSelfdestructGroup sends SIGTERM to whole process group
+func SignalSelfdestructGroup(ctx context.Context) bool {
+	gpid, err := syscall.Getpgid(os.Getpid())
+	if err == nil {
+		if err = syscall.Kill(gpid, syscall.SIGTERM); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// SignalSelfdestructProcess sends SIGTERM to current process
+func SignalSelfdestructProcess(ctx context.Context) bool {
 	proc, err := os.FindProcess(os.Getpid())
 	if err == nil {
 		if err = proc.Signal(syscall.SIGTERM); err == nil {
